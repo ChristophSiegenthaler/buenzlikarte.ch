@@ -22,12 +22,31 @@
     <script>
         var map = L.map('map').setView([46.86, 8.30], 9);
 
-        // SwissALTI3D WMTS layer
-        L.tileLayer('https://wmts.geo.admin.ch/1.0.0/ch.swisstopo.swissalti3d-reliefschattierung/default/current/3857/{z}/{x}/{y}.png', {
+        // SwissALTI3D WMTS layer (base layer)
+        var baseLayer = L.tileLayer('https://wmts.geo.admin.ch/1.0.0/ch.swisstopo.swissalti3d-reliefschattierung/default/current/3857/{z}/{x}/{y}.png', {
             attribution: '&copy; <a href="https://www.swisstopo.admin.ch/">swisstopo</a>',
             maxZoom: 18,
             minZoom: 6
         }).addTo(map);
+
+        // Aviation obstacles layer (overlay)
+        var obstaclesLayer = L.tileLayer.wms('https://wms.geo.admin.ch/', {
+            layers: 'ch.bazl.luftfahrthindernis',
+            format: 'image/png',
+            transparent: true,
+            attribution: '&copy; BAZL'
+        }).addTo(map);
+
+        // Layer control
+        var baseMaps = {
+            "Relief": baseLayer
+        };
+        
+        var overlayMaps = {
+            "Aviation Obstacles": obstaclesLayer
+        };
+
+        L.control.layers(baseMaps, overlayMaps).addTo(map);
     </script>
 </body>
 </html>
