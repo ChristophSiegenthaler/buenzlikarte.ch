@@ -36,6 +36,14 @@
             transparent: true,
             attribution: '&copy; BAZL'
         }).addTo(map);
+        
+	// Aviation Map layer (overlay)
+        var aviationLayer = L.tileLayer.wms('https://wms.geo.admin.ch/', {
+            layers: 'ch.bazl.segelflugkarte',
+            format: 'image/png',
+            transparent: true,
+            attribution: '&copy; BAZL'
+        }).addTo(map);
 
         // Layer control
         var baseMaps = {
@@ -43,7 +51,8 @@
         };
         
         var overlayMaps = {
-            "Aviation Obstacles": obstaclesLayer
+            "Aviation Obstacles": obstaclesLayer,
+            "Aviation Map": aviationLayer
         };
 
         L.control.layers(baseMaps, overlayMaps).addTo(map);
