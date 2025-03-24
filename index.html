@@ -29,9 +29,32 @@
             minZoom: 6
         }).addTo(map);
 
+	// Airspaces
+        async function load_airspace() {
+          let url = 'https://airspace.shv-fsvl.ch/api/v1/geojson/airspaces';
+          const response = await fetch(url)
+          const shape_obj = await response.json();
+          console.log(shape_obj);
+          return shape_obj;
+        }
+
+        load_airspace().then(L.geoJson).then(map.addLayer.bind(map));
+	
+	// Wildlife
+        async function load_wildlife() {
+          let url = 'https://airspace.shv-fsvl.ch/api/v1/geojson/wildlife';
+          const response = await fetch(url)
+          const shape_obj = await response.json();
+          console.log(shape_obj);
+          return shape_obj;
+        }
+
+        load_wildlife().then(L.geoJson).then(map.addLayer.bind(map));
+
         // Aviation obstacles layer (overlay)
         var obstaclesLayer = L.tileLayer.wms('https://wms.geo.admin.ch/', {
             layers: 'ch.bazl.luftfahrthindernis',
+	    tileSize: 1024,
             format: 'image/png',
             transparent: true,
             attribution: '&copy; BAZL'
@@ -43,7 +66,7 @@
             format: 'image/png',
             transparent: true,
             attribution: '&copy; BAZL'
-        }).addTo(map);
+        });
 
         // Layer control
         var baseMaps = {
