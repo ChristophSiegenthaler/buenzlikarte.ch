@@ -29,16 +29,80 @@
             minZoom: 6
         }).addTo(map);
 
-	// Airspaces
-        async function load_airspace() {
-          let url = 'https://airspace.shv-fsvl.ch/api/v1/geojson/airspaces';
-          const response = await fetch(url)
-          const shape_obj = await response.json();
-          console.log(shape_obj);
-          return shape_obj;
+        // Airspaces with complete legend
+        var airspaceStyles = {
+            'CTA': { color: '#800000', weight: 2, opacity: 0.8, fillOpacity: 0 },      // Dark Red, no fill
+            'AWY': { color: '#008080', weight: 2, opacity: 0.8, fillOpacity: 0.1 },    // Teal
+            'CTR': { color: '#0000ff', weight: 2, opacity: 0.8, fillOpacity: 0.1 },    // Blue
+            'TMA': { color: '#4b0082', weight: 2, opacity: 0.8, fillOpacity: 0.1 },    // Indigo
+            'FIZ': { color: '#006400', weight: 2, opacity: 0.8, fillOpacity: 0.1 },    // Dark Green
+            'RMZ': { color: '#daa520', weight: 2, opacity: 0.8, fillOpacity: 0.1 },    // Goldenrod
+            'Q': { color: '#ffa500', weight: 2, opacity: 0.8, fillOpacity: 0.1 },      // Orange (Danger Area)
+            'R': { color: '#ff0000', weight: 2, opacity: 0.8, fillOpacity: 0.1 },      // Red (Restricted Area)
+            'W': { color: '#9400d3', weight: 2, opacity: 0.8, fillOpacity: 0.1 },      // Dark Violet (Glider Sector)
+            'Airfield': { color: '#2f4f4f', weight: 2, opacity: 0.8, fillOpacity: 0.1 }, // Dark Slate Gray
+            'Heliport': { color: '#556b2f', weight: 2, opacity: 0.8, fillOpacity: 0.1 }, // Dark Olive Green
+            'default': { color: '#808080', weight: 2, opacity: 0.8, fillOpacity: 0.1 }   // Gray for unknown types
+        };
+
+        var airspaceLayers = {};
+
+        function isAirspaceActiveToday(feature) {
+            const currentDay = new Date().getDay(); // 0 = Sunday, 1 = Monday, etc.
+
+            // If no activation times specified, consider it always active
+            if (!feature.properties.ActTimes || !feature.properties.ActTimes.length) {
+                return true;
+            }
+
+            // Check if any activation time includes the current day
+            return feature.properties.ActTimes.some(time => {
+                // If no days specified, consider it active every day
+                if (!time.days || !time.days.length) {
+                    return true;
+                }
+                // Check if current day is in the activation days
+                return time.days.includes(currentDay);
+            });
         }
 
-        load_airspace().then(L.geoJson).then(map.addLayer.bind(map));
+        async function load_airspace() {
+            let url = 'https://airspace.shv-fsvl.ch/api/v1/geojson/airspaces';
+            const response = await fetch(url);
+            const data = await response.json();
+            
+            // Group features by ASType, filtering out inactive ones
+            const groupedFeatures = data.features
+                .filter(isAirspaceActiveToday)
+                .reduce((acc, feature) => {
+                    const type = feature.properties.ASType || 'default';
+                    if (!acc[type]) {
+                        acc[type] = {
+                            type: 'FeatureCollection',
+                            features: []
+                        };
+                    }
+                    acc[type].features.push(feature);
+                    return acc;
+                }, {});
+
+            // Create a layer for each type
+            Object.entries(groupedFeatures).forEach(([type, featureCollection]) => {
+                const style = airspaceStyles[type] || airspaceStyles.default;
+                const layer = L.geoJson(featureCollection, {
+                    style: (feature) => {
+                        const baseStyle = { ...style };
+                        // Remove fill for InactiveByAgreement areas
+                        if (feature.properties.InactiveByAgreement) {
+                            baseStyle.fillOpacity = 0;
+                        }
+                        return baseStyle;
+                    }
+                });
+                airspaceLayers[`Airspace ${type}`] = layer;
+                layer.addTo(map);  // Add layer to map by default
+            });
+        }
 	
        // Wildlife
         async function load_wildlife() {
@@ -50,8 +114,8 @@
         }
 
         var wildlifeStyle = {
-            "color": "#00dd00",
-            "weight": 3,
+            "color": "#00ee00",
+            "weight": 2.5,
             "opacity": 0.60
         };
 
