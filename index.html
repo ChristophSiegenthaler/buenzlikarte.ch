@@ -40,22 +40,24 @@
 
         load_airspace().then(L.geoJson).then(map.addLayer.bind(map));
 	
-	// Wildlife
+       // Wildlife
         async function load_wildlife() {
-          let url = 'https://airspace.shv-fsvl.ch/api/v1/geojson/wildlife';
-          const response = await fetch(url)
-          const shape_obj = await response.json();
-          console.log(shape_obj);
-          return shape_obj;
+            let url = 'https://airspace.shv-fsvl.ch/api/v1/geojson/wildlife';
+            const response = await fetch(url)
+            const shape_obj = await response.json();
+            console.log(shape_obj);
+            return shape_obj;
         }
-	    
-	var wildlifeStyle = {
- 	   "color": "#00ff00",
-	    "weight": 5,
-	    "opacity": 0.60
-	};
 
-        load_wildlife().then(L.geoJson){style: wildlifeStyle}.then(map.addLayer.bind(map));
+        var wildlifeStyle = {
+            "color": "#00dd00",
+            "weight": 3,
+            "opacity": 0.60
+        };
+
+        load_wildlife()
+            .then(data => L.geoJson(data, { style: wildlifeStyle }))
+            .then(map.addLayer.bind(map));
 
         // Aviation obstacles layer (overlay)
         var obstaclesLayer = L.tileLayer.wms('https://wms.geo.admin.ch/', {
