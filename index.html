@@ -140,17 +140,21 @@
             attribution: '&copy; BAZL'
         });
 
-        // Layer control
-        var baseMaps = {
-            "Relief": baseLayer
-        };
-        
-        var overlayMaps = {
-            "Aviation Obstacles": obstaclesLayer,
-            "Aviation Map": aviationLayer
-        };
+        // Load airspaces and update layer control after loading
+        load_airspace().then(() => {
+            // Layer control
+            var baseMaps = {
+                "Relief": baseLayer
+            };
+            
+            var overlayMaps = {
+                ...airspaceLayers,
+                "Aviation Obstacles": obstaclesLayer,
+                "Aviation Map": aviationLayer
+            };
 
-        L.control.layers(baseMaps, overlayMaps).addTo(map);
+            L.control.layers(baseMaps, overlayMaps).addTo(map);
+        });
     </script>
 </body>
 </html>
