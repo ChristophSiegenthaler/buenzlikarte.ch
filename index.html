@@ -48,8 +48,14 @@
           console.log(shape_obj);
           return shape_obj;
         }
+	    
+	var wildlifeStyle = {
+ 	   "color": "#00ff00",
+	    "weight": 5,
+	    "opacity": 0.60
+	};
 
-        load_wildlife().then(L.geoJson).then(map.addLayer.bind(map));
+        load_wildlife().then(L.geoJson){style: wildlifeStyle}.then(map.addLayer.bind(map));
 
         // Aviation obstacles layer (overlay)
         var obstaclesLayer = L.tileLayer.wms('https://wms.geo.admin.ch/', {
