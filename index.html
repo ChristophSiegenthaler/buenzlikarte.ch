@@ -5,6 +5,7 @@
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.7.1/dist/leaflet.css" />
+    <link rel="stylesheet" href="https://unpkg.com/maplibre-gl@3.6.2/dist/maplibre-gl.css" />
     <style>
         body {
             padding: 0;
@@ -19,6 +20,8 @@
 <body>
     <div id="map"></div>
     <script src="https://unpkg.com/leaflet@1.7.1/dist/leaflet.js"></script>
+    <script src="https://unpkg.com/maplibre-gl@3.6.2/dist/maplibre-gl.js"></script>
+    <script src="https://unpkg.com/@maplibre/maplibre-gl-leaflet@0.0.19/leaflet-maplibre-gl.js"></script>
     <script>
         var map = L.map('map').setView([46.86, 8.30], 9);
 
@@ -27,21 +30,66 @@
             attribution: '&copy; <a href="https://www.swisstopo.admin.ch/">swisstopo</a>',
             maxZoom: 18,
             minZoom: 6
-        }).addTo(map);
+        });
 
-        var basemapLayer = L.tileLayer('', {
-			attribution: '&copy; <a href="https://www.swisstopo.admin.ch/">swisstopo</a>',
+        // Vector basemap layer
+        var basemapLayer = L.maplibreGL({
+            style: 'https://vectortiles.geo.admin.ch/styles/ch.swisstopo.basemap.vt/style.json',
+            attribution: '&copy; <a href="https://www.swisstopo.admin.ch/">swisstopo</a>'
+        });
+
+        // Hiking trails layer
+        var hikingLayer = L.tileLayer('https://wmts.geo.admin.ch/1.0.0/ch.swisstopo.swisstlm3d-wanderwege/default/current/3857/{z}/{x}/{y}.png', {
+            attribution: '&copy; <a href="https://www.swisstopo.admin.ch/">swisstopo</a>',
             maxZoom: 18,
             minZoom: 6
-        }).addTo(map);
+        });
 		
 	    var baseMaps = {
-		"Relief": baseLayer
+            "Basic Map": basemapLayer,
+            "Relief": baseLayer
 	    };
-	    
-	    var overlayMaps = {
-		"Basic Map": basemapLayer
-	    };
+
+        var overlayMaps = {
+            "Hiking Trails": hikingLayer
+        };
+
+        // Add layers
+        basemapLayer.addTo(map);
+        baseLayer.addTo(map);
+        hikingLayer.addTo(map);
+
+        // Helper function to apply buffer and clamp values
+        function getBufferedOpacity(value, min = 0, max = 1, bufferPercent = 5) {
+            const bufferZone = bufferPercent / 100;
+            
+            if (value <= bufferZone) {
+                return min;
+            } else if (value >= (1 - bufferZone)) {
+                return max;
+            }
+            
+            // Rescale the middle 90% to full range
+            return (value - bufferZone) * (max - min) / (1 - 2 * bufferZone);
+        }
+
+        // Add mouse move handler for both X and Y axis controls
+        map.getContainer().addEventListener('mousemove', function(e) {
+            var width = map.getContainer().offsetWidth;
+            var height = map.getContainer().offsetHeight;
+            var mouseX = e.clientX;
+            var mouseY = e.clientY;
+            
+            // X-axis controls relief layer opacity (with buffer)
+            var normalizedX = mouseX / width;
+            var reliefOpacity = getBufferedOpacity(normalizedX);
+            baseLayer.setOpacity(reliefOpacity);
+
+            // Y-axis controls hiking trails opacity (inverted, with buffer)
+            var normalizedY = mouseY / height;
+            var hikingOpacity = getBufferedOpacity(1 - normalizedY);
+            hikingLayer.setOpacity(hikingOpacity);
+        });
 	
 	    L.control.layers(baseMaps, overlayMaps).addTo(map);
     </script>
