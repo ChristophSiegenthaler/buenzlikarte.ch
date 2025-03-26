@@ -1,2 +1,2 @@
-# buenzlikarte.ch
-A simple test map
+# trailrunningmap.ch
+A simple trailrunning map
