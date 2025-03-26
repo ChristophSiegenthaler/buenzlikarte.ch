@@ -1,11 +1,12 @@
 <!DOCTYPE html>
 <html>
 <head>
-    <title>Bünzlikarte</title>
+    <title>Trailrunningmap.ch</title>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.7.1/dist/leaflet.css" />
     <link rel="stylesheet" href="https://unpkg.com/maplibre-gl@3.6.2/dist/maplibre-gl.css" />
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" />
     <style>
         body {
             padding: 0;
@@ -15,10 +16,57 @@
             height: 100%;
             width: 100%;
         }
+        .mobile-controls {
+            display: none;
+            position: fixed;
+            bottom: 20px;
+            left: 50%;
+            transform: translateX(-50%);
+            background: rgba(255, 255, 255, 0.9);
+            padding: 10px 15px;
+            border-radius: 8px;
+            box-shadow: 0 2px 5px rgba(0, 0, 0, 0.2);
+            z-index: 1000;
+            width: 80%;
+            max-width: 300px;
+        }
+        .slider-container {
+            display: flex;
+            align-items: center;
+            margin: 8px 0;
+            gap: 10px;
+        }
+        .slider-icon {
+            width: 20px;
+            color: #666;
+            text-align: center;
+        }
+        .slider {
+            flex-grow: 1;
+        }
+        @media (max-width: 768px) {
+            .mobile-controls {
+                display: block;
+            }
+        }
     </style>
 </head>
 <body>
     <div id="map"></div>
+    <div class="mobile-controls">
+        <div class="slider-container">
+            <div class="slider-icon">
+                <i class="fas fa-mountain"></i>
+            </div>
+            <input type="range" id="relief-slider" class="slider" min="0" max="100" value="50">
+        </div>
+        <div class="slider-container">
+            <div class="slider-icon">
+                <i class="fas fa-hiking"></i>
+            </div>
+            <input type="range" id="hiking-slider" class="slider" min="0" max="100" value="50">
+        </div>
+    </div>
     <script src="https://unpkg.com/leaflet@1.7.1/dist/leaflet.js"></script>
     <script src="https://unpkg.com/maplibre-gl@3.6.2/dist/maplibre-gl.js"></script>
     <script src="https://unpkg.com/@maplibre/maplibre-gl-leaflet@0.0.19/leaflet-maplibre-gl.js"></script>
@@ -44,15 +92,6 @@
             maxZoom: 18,
             minZoom: 6
         });
-		
-	    var baseMaps = {
-            "Basic Map": basemapLayer,
-            "Relief": baseLayer
-	    };
-
-        var overlayMaps = {
-            "Hiking Trails": hikingLayer
-        };
 
         // Add layers
         basemapLayer.addTo(map);
@@ -73,25 +112,50 @@
             return (value - bufferZone) * (max - min) / (1 - 2 * bufferZone);
         }
 
-        // Add mouse move handler for both X and Y axis controls
-        map.getContainer().addEventListener('mousemove', function(e) {
-            var width = map.getContainer().offsetWidth;
-            var height = map.getContainer().offsetHeight;
-            var mouseX = e.clientX;
-            var mouseY = e.clientY;
-            
-            // X-axis controls relief layer opacity (with buffer)
-            var normalizedX = mouseX / width;
-            var reliefOpacity = getBufferedOpacity(normalizedX);
-            baseLayer.setOpacity(reliefOpacity);
+        // Function to handle both mouse and touch events
+        function handleInteraction(clientX, clientY) {
+            // Only handle mouse/touch interactions on desktop
+            if (window.innerWidth > 768) {
+                var width = map.getContainer().offsetWidth;
+                var height = map.getContainer().offsetHeight;
+                
+                // X-axis controls relief layer opacity (with buffer)
+                var normalizedX = clientX / width;
+                var reliefOpacity = getBufferedOpacity(normalizedX);
+                baseLayer.setOpacity(reliefOpacity);
 
-            // Y-axis controls hiking trails opacity (inverted, with buffer)
-            var normalizedY = mouseY / height;
-            var hikingOpacity = getBufferedOpacity(1 - normalizedY);
-            hikingLayer.setOpacity(hikingOpacity);
+                // Y-axis controls hiking trails opacity (inverted, with buffer)
+                var normalizedY = clientY / height;
+                var hikingOpacity = getBufferedOpacity(1 - normalizedY);
+                hikingLayer.setOpacity(hikingOpacity);
+            }
+        }
+
+        // Mouse move handler
+        map.getContainer().addEventListener('mousemove', function(e) {
+            handleInteraction(e.clientX, e.clientY);
         });
-	
-	    L.control.layers(baseMaps, overlayMaps).addTo(map);
+
+        // Handle slider changes
+        document.getElementById('relief-slider').addEventListener('input', function(e) {
+            const opacity = e.target.value / 100;
+            baseLayer.setOpacity(opacity);
+        });
+
+        document.getElementById('hiking-slider').addEventListener('input', function(e) {
+            const opacity = e.target.value / 100;
+            hikingLayer.setOpacity(opacity);
+        });
+
+        // Reset opacities when mouse leaves the map (desktop only)
+        function resetOpacities() {
+            if (window.innerWidth > 768) {
+                baseLayer.setOpacity(0.5);
+                hikingLayer.setOpacity(0.5);
+            }
+        }
+
+        map.getContainer().addEventListener('mouseleave', resetOpacities);
     </script>
 </body>
 </html>
