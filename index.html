@@ -1,10 +1,12 @@
 <!DOCTYPE html>
 <html>
 <head>
-    <title>Bünzlikarte</title>
+    <title>Trailrunningmap.ch</title>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.7.1/dist/leaflet.css" />
+    <link rel="stylesheet" href="https://unpkg.com/maplibre-gl@3.6.2/dist/maplibre-gl.css" />
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" />
     <style>
         body {
             padding: 0;
@@ -14,11 +16,60 @@
             height: 100%;
             width: 100%;
         }
+        .mobile-controls {
+            display: none;
+            position: fixed;
+            bottom: 20px;
+            left: 50%;
+            transform: translateX(-50%);
+            background: rgba(255, 255, 255, 0.9);
+            padding: 10px 15px;
+            border-radius: 8px;
+            box-shadow: 0 2px 5px rgba(0, 0, 0, 0.2);
+            z-index: 1000;
+            width: 80%;
+            max-width: 300px;
+        }
+        .slider-container {
+            display: flex;
+            align-items: center;
+            margin: 8px 0;
+            gap: 10px;
+        }
+        .slider-icon {
+            width: 20px;
+            color: #666;
+            text-align: center;
+        }
+        .slider {
+            flex-grow: 1;
+        }
+        @media (max-width: 768px) {
+            .mobile-controls {
+                display: block;
+            }
+        }
     </style>
 </head>
 <body>
     <div id="map"></div>
+    <div class="mobile-controls">
+        <div class="slider-container">
+            <div class="slider-icon">
+                <i class="fas fa-mountain"></i>
+            </div>
+            <input type="range" id="relief-slider" class="slider" min="0" max="100" value="50">
+        </div>
+        <div class="slider-container">
+            <div class="slider-icon">
+                <i class="fas fa-hiking"></i>
+            </div>
+            <input type="range" id="hiking-slider" class="slider" min="0" max="100" value="50">
+        </div>
+    </div>
     <script src="https://unpkg.com/leaflet@1.7.1/dist/leaflet.js"></script>
+    <script src="https://unpkg.com/maplibre-gl@3.6.2/dist/maplibre-gl.js"></script>
+    <script src="https://unpkg.com/@maplibre/maplibre-gl-leaflet@0.0.19/leaflet-maplibre-gl.js"></script>
     <script>
         var map = L.map('map').setView([46.86, 8.30], 9);
 
@@ -27,134 +78,84 @@
             attribution: '&copy; <a href="https://www.swisstopo.admin.ch/">swisstopo</a>',
             maxZoom: 18,
             minZoom: 6
-        }).addTo(map);
+        });
 
-        // Airspaces with complete legend
-        var airspaceStyles = {
-            'CTA': { color: '#800000', weight: 2, opacity: 0.8, fillOpacity: 0 },      // Dark Red, no fill
-            'AWY': { color: '#008080', weight: 2, opacity: 0.8, fillOpacity: 0.1 },    // Teal
-            'CTR': { color: '#0000ff', weight: 2, opacity: 0.8, fillOpacity: 0.1 },    // Blue
-            'TMA': { color: '#4b0082', weight: 2, opacity: 0.8, fillOpacity: 0.1 },    // Indigo
-            'FIZ': { color: '#006400', weight: 2, opacity: 0.8, fillOpacity: 0.1 },    // Dark Green
-            'RMZ': { color: '#daa520', weight: 2, opacity: 0.8, fillOpacity: 0.1 },    // Goldenrod
-            'Q': { color: '#ffa500', weight: 2, opacity: 0.8, fillOpacity: 0.1 },      // Orange (Danger Area)
-            'R': { color: '#ff0000', weight: 2, opacity: 0.8, fillOpacity: 0.1 },      // Red (Restricted Area)
-            'W': { color: '#9400d3', weight: 2, opacity: 0.8, fillOpacity: 0.1 },      // Dark Violet (Glider Sector)
-            'Airfield': { color: '#2f4f4f', weight: 2, opacity: 0.8, fillOpacity: 0.1 }, // Dark Slate Gray
-            'Heliport': { color: '#556b2f', weight: 2, opacity: 0.8, fillOpacity: 0.1 }, // Dark Olive Green
-            'default': { color: '#808080', weight: 2, opacity: 0.8, fillOpacity: 0.1 }   // Gray for unknown types
-        };
+        // Vector basemap layer
+        var basemapLayer = L.maplibreGL({
+            style: 'https://vectortiles.geo.admin.ch/styles/ch.swisstopo.basemap.vt/style.json',
+            attribution: '&copy; <a href="https://www.swisstopo.admin.ch/">swisstopo</a>'
+        });
 
-        var airspaceLayers = {};
+        // Hiking trails layer
+        var hikingLayer = L.tileLayer('https://wmts.geo.admin.ch/1.0.0/ch.swisstopo.swisstlm3d-wanderwege/default/current/3857/{z}/{x}/{y}.png', {
+            attribution: '&copy; <a href="https://www.swisstopo.admin.ch/">swisstopo</a>',
+            maxZoom: 18,
+            minZoom: 6
+        });
 
-        function isAirspaceActiveToday(feature) {
-            const currentDay = new Date().getDay(); // 0 = Sunday, 1 = Monday, etc.
+        // Add layers
+        basemapLayer.addTo(map);
+        baseLayer.addTo(map);
+        hikingLayer.addTo(map);
 
-            // If no activation times specified, consider it always active
-            if (!feature.properties.ActTimes || !feature.properties.ActTimes.length) {
-                return true;
+        // Helper function to apply buffer and clamp values
+        function getBufferedOpacity(value, min = 0, max = 1, bufferPercent = 5) {
+            const bufferZone = bufferPercent / 100;
+            
+            if (value <= bufferZone) {
+                return min;
+            } else if (value >= (1 - bufferZone)) {
+                return max;
             }
-
-            // Check if any activation time includes the current day
-            return feature.properties.ActTimes.some(time => {
-                // If no days specified, consider it active every day
-                if (!time.days || !time.days.length) {
-                    return true;
-                }
-                // Check if current day is in the activation days
-                return time.days.includes(currentDay);
-            });
-        }
-
-        async function load_airspace() {
-            let url = 'https://airspace.shv-fsvl.ch/api/v1/geojson/airspaces';
-            const response = await fetch(url);
-            const data = await response.json();
             
-            // Group features by ASType, filtering out inactive ones
-            const groupedFeatures = data.features
-                .filter(isAirspaceActiveToday)
-                .reduce((acc, feature) => {
-                    const type = feature.properties.ASType || 'default';
-                    if (!acc[type]) {
-                        acc[type] = {
-                            type: 'FeatureCollection',
-                            features: []
-                        };
-                    }
-                    acc[type].features.push(feature);
-                    return acc;
-                }, {});
-
-            // Create a layer for each type
-            Object.entries(groupedFeatures).forEach(([type, featureCollection]) => {
-                const style = airspaceStyles[type] || airspaceStyles.default;
-                const layer = L.geoJson(featureCollection, {
-                    style: (feature) => {
-                        const baseStyle = { ...style };
-                        // Remove fill for InactiveByAgreement areas
-                        if (feature.properties.InactiveByAgreement) {
-                            baseStyle.fillOpacity = 0;
-                        }
-                        return baseStyle;
-                    }
-                });
-                airspaceLayers[`Airspace ${type}`] = layer;
-                layer.addTo(map);  // Add layer to map by default
-            });
-        }
-	
-       // Wildlife
-        async function load_wildlife() {
-            let url = 'https://airspace.shv-fsvl.ch/api/v1/geojson/wildlife';
-            const response = await fetch(url)
-            const shape_obj = await response.json();
-            console.log(shape_obj);
-            return shape_obj;
+            // Rescale the middle 90% to full range
+            return (value - bufferZone) * (max - min) / (1 - 2 * bufferZone);
         }
 
-        var wildlifeStyle = {
-            "color": "#00ee00",
-            "weight": 2.5,
-            "opacity": 0.60
-        };
+        // Function to handle both mouse and touch events
+        function handleInteraction(clientX, clientY) {
+            // Only handle mouse/touch interactions on desktop
+            if (window.innerWidth > 768) {
+                var width = map.getContainer().offsetWidth;
+                var height = map.getContainer().offsetHeight;
+                
+                // X-axis controls relief layer opacity (with buffer)
+                var normalizedX = clientX / width;
+                var reliefOpacity = getBufferedOpacity(normalizedX);
+                baseLayer.setOpacity(reliefOpacity);
 
-        load_wildlife()
-            .then(data => L.geoJson(data, { style: wildlifeStyle }))
-            .then(map.addLayer.bind(map));
+                // Y-axis controls hiking trails opacity (inverted, with buffer)
+                var normalizedY = clientY / height;
+                var hikingOpacity = getBufferedOpacity(1 - normalizedY);
+                hikingLayer.setOpacity(hikingOpacity);
+            }
+        }
 
-        // Aviation obstacles layer (overlay)
-        var obstaclesLayer = L.tileLayer.wms('https://wms.geo.admin.ch/', {
-            layers: 'ch.bazl.luftfahrthindernis',
-	    tileSize: 1024,
-            format: 'image/png',
-            transparent: true,
-            attribution: '&copy; BAZL'
-        }).addTo(map);
-        
-	// Aviation Map layer (overlay)
-        var aviationLayer = L.tileLayer.wms('https://wms.geo.admin.ch/', {
-            layers: 'ch.bazl.segelflugkarte',
-            format: 'image/png',
-            transparent: true,
-            attribution: '&copy; BAZL'
+        // Mouse move handler
+        map.getContainer().addEventListener('mousemove', function(e) {
+            handleInteraction(e.clientX, e.clientY);
         });
 
-        // Load airspaces and update layer control after loading
-        load_airspace().then(() => {
-            // Layer control
-            var baseMaps = {
-                "Relief": baseLayer
-            };
-            
-            var overlayMaps = {
-                ...airspaceLayers,
-                "Aviation Obstacles": obstaclesLayer,
-                "Aviation Map": aviationLayer
-            };
-
-            L.control.layers(baseMaps, overlayMaps).addTo(map);
+        // Handle slider changes
+        document.getElementById('relief-slider').addEventListener('input', function(e) {
+            const opacity = e.target.value / 100;
+            baseLayer.setOpacity(opacity);
         });
+
+        document.getElementById('hiking-slider').addEventListener('input', function(e) {
+            const opacity = e.target.value / 100;
+            hikingLayer.setOpacity(opacity);
+        });
+
+        // Reset opacities when mouse leaves the map (desktop only)
+        function resetOpacities() {
+            if (window.innerWidth > 768) {
+                baseLayer.setOpacity(0.5);
+                hikingLayer.setOpacity(0.5);
+            }
+        }
+
+        map.getContainer().addEventListener('mouseleave', resetOpacities);
     </script>
 </body>
 </html>
