@@ -124,11 +124,19 @@
         var isWatchingLocation = false;
         var locationWatchId = null;
 
+        // Store current layer opacities
+        var currentOpacities = {
+            relief: 0.5,
+            hiking: 0.5
+        };
+
         // SwissALTI3D WMTS layer (base layer)
         var baseLayer = L.tileLayer('https://wmts.geo.admin.ch/1.0.0/ch.swisstopo.swissalti3d-reliefschattierung/default/current/3857/{z}/{x}/{y}.png', {
             attribution: '&copy; <a href="https://www.swisstopo.admin.ch/">swisstopo</a>',
             maxZoom: 18,
-            minZoom: 6
+            minZoom: 6,
+            opacity: currentOpacities.relief,
+            zIndex: 1
         });
 
         // Vector basemap layer
@@ -147,14 +155,16 @@
         var hikingLayer = L.tileLayer('https://wmts.geo.admin.ch/1.0.0/ch.swisstopo.swisstlm3d-wanderwege/default/current/3857/{z}/{x}/{y}.png', {
             attribution: '&copy; <a href="https://www.swisstopo.admin.ch/">swisstopo</a>',
             maxZoom: 18,
-            minZoom: 6
+            minZoom: 6,
+            opacity: currentOpacities.hiking,
+            zIndex: 2
         });
 
-        // Add layers
+        // Initial layer setup
         var currentBasemap = vectorBasemap;
-        currentBasemap.addTo(map);
-        baseLayer.addTo(map);
-        hikingLayer.addTo(map);
+        map.addLayer(currentBasemap);
+        map.addLayer(baseLayer);
+        map.addLayer(hikingLayer);
 
         // Location tracking functions
         function updateLocationMarker(position) {
@@ -224,7 +234,11 @@
 
         mapToggle.addEventListener('click', function() {
             isSatellite = !isSatellite;
+            
+            // Remove all layers and add them back in the correct order
             map.removeLayer(currentBasemap);
+            map.removeLayer(baseLayer);
+            map.removeLayer(hikingLayer);
             
             if (isSatellite) {
                 currentBasemap = satelliteBasemap;
@@ -234,10 +248,14 @@
                 mapToggle.innerHTML = '<i class="fas fa-satellite"></i>';
             }
             
-            currentBasemap.addTo(map);
+            // Add layers back in correct order: basemap first, then relief, then hiking
             map.addLayer(currentBasemap);
-            map.addLayer(baseLayer);
-            map.addLayer(hikingLayer);
+            if (currentOpacities.relief > 0) {
+                map.addLayer(baseLayer);
+            }
+            if (currentOpacities.hiking > 0) {
+                map.addLayer(hikingLayer);
+            }
         });
 
         // Helper function to apply buffer and clamp values
@@ -245,9 +263,9 @@
             const bufferZone = bufferPercent / 100;
             
             if (value <= bufferZone) {
-                return min;
+                return 0;
             } else if (value >= (1 - bufferZone)) {
-                return max;
+                return 1;
             }
             
             // Rescale the middle 90% to full range
@@ -255,19 +273,23 @@
         }
 
         // Function to handle both mouse and touch events
-        function handleInteraction(clientX, clientY) {
+        function handleInteraction(event) {
             // Only handle mouse/touch interactions on desktop
             if (window.innerWidth > 768) {
-                var width = map.getContainer().offsetWidth;
-                var height = map.getContainer().offsetHeight;
+                var mapContainer = map.getContainer();
+                var rect = mapContainer.getBoundingClientRect();
+                
+                // Get mouse position relative to map container
+                var x = event.clientX - rect.left;
+                var y = event.clientY - rect.top;
                 
                 // X-axis controls relief layer opacity (with buffer)
-                var normalizedX = clientX / width;
+                var normalizedX = Math.max(0, Math.min(1, x / rect.width));
                 var reliefOpacity = getBufferedOpacity(normalizedX);
                 updateReliefLayer(reliefOpacity);
 
                 // Y-axis controls hiking trails opacity (inverted, with buffer)
-                var normalizedY = clientY / height;
+                var normalizedY = Math.max(0, Math.min(1, y / rect.height));
                 var hikingOpacity = getBufferedOpacity(1 - normalizedY);
                 updateHikingLayer(hikingOpacity);
             }
@@ -275,6 +297,7 @@
 
         // Function to update relief layer
         function updateReliefLayer(opacity) {
+            currentOpacities.relief = opacity;
             if (opacity === 0) {
                 if (map.hasLayer(baseLayer)) {
                     map.removeLayer(baseLayer);
@@ -289,6 +312,7 @@
 
         // Function to update hiking layer
         function updateHikingLayer(opacity) {
+            currentOpacities.hiking = opacity;
             if (opacity === 0) {
                 if (map.hasLayer(hikingLayer)) {
                     map.removeLayer(hikingLayer);
@@ -303,7 +327,7 @@
 
         // Mouse move handler
         map.getContainer().addEventListener('mousemove', function(e) {
-            handleInteraction(e.clientX, e.clientY);
+            handleInteraction(e);
         });
 
         // Handle slider changes
