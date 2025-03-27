@@ -44,6 +44,27 @@
         .slider {
             flex-grow: 1;
         }
+        .map-toggle {
+            position: fixed;
+            bottom: 20px;
+            left: 20px;
+            z-index: 1000;
+            background: white;
+            border: none;
+            border-radius: 4px;
+            padding: 8px;
+            box-shadow: 0 2px 5px rgba(0, 0, 0, 0.2);
+            cursor: pointer;
+            font-size: 18px;
+            width: 36px;
+            height: 36px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+        .map-toggle:hover {
+            background: #f0f0f0;
+        }
         @media (max-width: 768px) {
             .mobile-controls {
                 display: block;
@@ -53,6 +74,9 @@
 </head>
 <body>
     <div id="map"></div>
+    <button class="map-toggle" id="mapToggle" title="Toggle map style">
+        <i class="fas fa-satellite"></i>
+    </button>
     <div class="mobile-controls">
         <div class="slider-container">
             <div class="slider-icon">
@@ -81,8 +105,14 @@
         });
 
         // Vector basemap layer
-        var basemapLayer = L.maplibreGL({
+        var vectorBasemap = L.maplibreGL({
             style: 'https://vectortiles.geo.admin.ch/styles/ch.swisstopo.basemap.vt/style.json',
+            attribution: '&copy; <a href="https://www.swisstopo.admin.ch/">swisstopo</a>'
+        });
+
+        // Satellite basemap layer
+        var satelliteBasemap = L.maplibreGL({
+            style: 'https://vectortiles.geo.admin.ch/styles/ch.swisstopo.imagerybasemap.vt/style.json',
             attribution: '&copy; <a href="https://www.swisstopo.admin.ch/">swisstopo</a>'
         });
 
@@ -94,9 +124,32 @@
         });
 
         // Add layers
-        basemapLayer.addTo(map);
+        var currentBasemap = vectorBasemap;
+        currentBasemap.addTo(map);
         baseLayer.addTo(map);
         hikingLayer.addTo(map);
+
+        // Toggle map style
+        var mapToggle = document.getElementById('mapToggle');
+        var isSatellite = false;
+
+        mapToggle.addEventListener('click', function() {
+            isSatellite = !isSatellite;
+            map.removeLayer(currentBasemap);
+            
+            if (isSatellite) {
+                currentBasemap = satelliteBasemap;
+                mapToggle.innerHTML = '<i class="fas fa-map"></i>';
+            } else {
+                currentBasemap = vectorBasemap;
+                mapToggle.innerHTML = '<i class="fas fa-satellite"></i>';
+            }
+            
+            currentBasemap.addTo(map);
+            map.addLayer(currentBasemap);
+            map.addLayer(baseLayer);
+            map.addLayer(hikingLayer);
+        });
 
         // Helper function to apply buffer and clamp values
         function getBufferedOpacity(value, min = 0, max = 1, bufferPercent = 5) {
