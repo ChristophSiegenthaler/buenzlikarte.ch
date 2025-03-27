@@ -65,6 +65,27 @@
         .map-toggle:hover {
             background: #f0f0f0;
         }
+        .location-button {
+            position: fixed;
+            bottom: 70px;
+            left: 20px;
+            z-index: 1000;
+            background: white;
+            border: none;
+            border-radius: 4px;
+            padding: 8px;
+            box-shadow: 0 2px 5px rgba(0, 0, 0, 0.2);
+            cursor: pointer;
+            font-size: 18px;
+            width: 36px;
+            height: 36px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+        .location-button:hover {
+            background: #f0f0f0;
+        }
         @media (max-width: 768px) {
             .mobile-controls {
                 display: block;
@@ -76,6 +97,9 @@
     <div id="map"></div>
     <button class="map-toggle" id="mapToggle" title="Toggle map style">
         <i class="fas fa-satellite"></i>
+    </button>
+    <button class="location-button" id="locationButton" title="Center on current location">
+        <i class="fas fa-location-crosshairs"></i>
     </button>
     <div class="mobile-controls">
         <div class="slider-container">
@@ -96,6 +120,9 @@
     <script src="https://unpkg.com/@maplibre/maplibre-gl-leaflet@0.0.19/leaflet-maplibre-gl.js"></script>
     <script>
         var map = L.map('map').setView([46.86, 8.30], 9);
+        var locationMarker = null;
+        var isWatchingLocation = false;
+        var locationWatchId = null;
 
         // SwissALTI3D WMTS layer (base layer)
         var baseLayer = L.tileLayer('https://wmts.geo.admin.ch/1.0.0/ch.swisstopo.swissalti3d-reliefschattierung/default/current/3857/{z}/{x}/{y}.png', {
@@ -128,6 +155,64 @@
         currentBasemap.addTo(map);
         baseLayer.addTo(map);
         hikingLayer.addTo(map);
+
+        // Location tracking functions
+        function updateLocationMarker(position) {
+            const latlng = [position.coords.latitude, position.coords.longitude];
+            
+            if (!locationMarker) {
+                locationMarker = L.marker(latlng).addTo(map);
+            } else {
+                locationMarker.setLatLng(latlng);
+            }
+        }
+
+        function handleLocationError(error) {
+            console.error('Error getting location:', error);
+            alert('Unable to get your location. Please check your device settings and try again.');
+        }
+
+        function startLocationTracking() {
+            if (!isWatchingLocation && 'geolocation' in navigator) {
+                locationWatchId = navigator.geolocation.watchPosition(
+                    updateLocationMarker,
+                    handleLocationError,
+                    {
+                        enableHighAccuracy: true,
+                        timeout: 5000,
+                        maximumAge: 0
+                    }
+                );
+                isWatchingLocation = true;
+            }
+        }
+
+        // Location button click handler
+        document.getElementById('locationButton').addEventListener('click', function() {
+            if ('geolocation' in navigator) {
+                navigator.geolocation.getCurrentPosition(
+                    function(position) {
+                        const latlng = [position.coords.latitude, position.coords.longitude];
+                        map.setView(latlng, 15);
+                        
+                        if (!isWatchingLocation) {
+                            startLocationTracking();
+                        }
+                    },
+                    handleLocationError,
+                    {
+                        enableHighAccuracy: true,
+                        timeout: 5000,
+                        maximumAge: 0
+                    }
+                );
+            } else {
+                alert('Geolocation is not supported by your browser');
+            }
+        });
+
+        // Start location tracking when the page loads
+        startLocationTracking();
 
         // Toggle map style
         var mapToggle = document.getElementById('mapToggle');
