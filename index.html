@@ -169,7 +169,11 @@
 
         function handleLocationError(error) {
             console.error('Error getting location:', error);
-            alert('Unable to get your location. Please check your device settings and try again.');
+            if (error.code === error.TIMEOUT) {
+                alert('Location request timed out. Please try again or check your device settings.');
+            } else {
+                alert('Unable to get your location. Please check your device settings and try again.');
+            }
         }
 
         function startLocationTracking() {
@@ -178,9 +182,9 @@
                     updateLocationMarker,
                     handleLocationError,
                     {
-                        enableHighAccuracy: true,
-                        timeout: 5000,
-                        maximumAge: 0
+                        enableHighAccuracy: false,
+                        timeout: 10000,
+                        maximumAge: 2000
                     }
                 );
                 isWatchingLocation = true;
@@ -201,9 +205,9 @@
                     },
                     handleLocationError,
                     {
-                        enableHighAccuracy: true,
-                        timeout: 5000,
-                        maximumAge: 0
+                        enableHighAccuracy: false,
+                        timeout: 10000,
+                        maximumAge: 2000
                     }
                 );
             } else {
@@ -260,12 +264,40 @@
                 // X-axis controls relief layer opacity (with buffer)
                 var normalizedX = clientX / width;
                 var reliefOpacity = getBufferedOpacity(normalizedX);
-                baseLayer.setOpacity(reliefOpacity);
+                updateReliefLayer(reliefOpacity);
 
                 // Y-axis controls hiking trails opacity (inverted, with buffer)
                 var normalizedY = clientY / height;
                 var hikingOpacity = getBufferedOpacity(1 - normalizedY);
-                hikingLayer.setOpacity(hikingOpacity);
+                updateHikingLayer(hikingOpacity);
+            }
+        }
+
+        // Function to update relief layer
+        function updateReliefLayer(opacity) {
+            if (opacity === 0) {
+                if (map.hasLayer(baseLayer)) {
+                    map.removeLayer(baseLayer);
+                }
+            } else {
+                if (!map.hasLayer(baseLayer)) {
+                    map.addLayer(baseLayer);
+                }
+                baseLayer.setOpacity(opacity);
+            }
+        }
+
+        // Function to update hiking layer
+        function updateHikingLayer(opacity) {
+            if (opacity === 0) {
+                if (map.hasLayer(hikingLayer)) {
+                    map.removeLayer(hikingLayer);
+                }
+            } else {
+                if (!map.hasLayer(hikingLayer)) {
+                    map.addLayer(hikingLayer);
+                }
+                hikingLayer.setOpacity(opacity);
             }
         }
 
@@ -277,19 +309,19 @@
         // Handle slider changes
         document.getElementById('relief-slider').addEventListener('input', function(e) {
             const opacity = e.target.value / 100;
-            baseLayer.setOpacity(opacity);
+            updateReliefLayer(opacity);
         });
 
         document.getElementById('hiking-slider').addEventListener('input', function(e) {
             const opacity = e.target.value / 100;
-            hikingLayer.setOpacity(opacity);
+            updateHikingLayer(opacity);
         });
 
         // Reset opacities when mouse leaves the map (desktop only)
         function resetOpacities() {
             if (window.innerWidth > 768) {
-                baseLayer.setOpacity(0.5);
-                hikingLayer.setOpacity(0.5);
+                updateReliefLayer(0.5);
+                updateHikingLayer(0.5);
             }
         }
 
